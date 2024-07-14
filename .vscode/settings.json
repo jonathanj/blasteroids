@@ -1,0 +1,13 @@
+{
+  "files.associations": {
+    ".fantomasignore": "ignore",
+    "display.h": "c",
+    "stdio.h": "c",
+    "vec2.h": "c",
+    "sdl.h": "c",
+    "stdint.h": "c",
+    "w_window.h": "c",
+    "k_keyboard.h": "c"
+  },
+  "C_Cpp.default.compilerPath": "C:\\msys64\\ucrt64\\bin\\gcc.exe"
+}
