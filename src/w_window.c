@@ -4,6 +4,8 @@
 SDL_Window *sdl_window = NULL;
 
 bool W_Init(const uint32_t window_width, const uint32_t window_height) {
+  // SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
+
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     M_Log("[Window] SDL could not initialize: %s\n", SDL_GetError());
     return false;

@@ -12,7 +12,7 @@ typedef enum {
   CONTROLLER_KEYBOARD_1,
   CONTROLLER_KEYBOARD_2,
   CONTROLLER_MOUSE,
-  CONTROLLER_GAMEPAD,
+  CONTROLLER_GAMEPAD_1,
 } g_controller_type;
 
 typedef struct {
@@ -31,6 +31,8 @@ typedef struct g_controller_t g_controller_t;
 struct g_controller_t {
   g_controller_input_state_t input_state;
   const g_controller_keymap_t *keymap;
+  void *device;
+  int32_t device_id;
   bool (*handle_event)(g_controller_t *controller, const SDL_Event *event);
 };
 

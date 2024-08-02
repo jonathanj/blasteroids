@@ -40,13 +40,6 @@ int main() {
 
   game_state_t game_state = G_Init(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, FPS);
   // player_t player = P_Init(200, 200, 0);
-
-  G_Controllers_Init();
-  g_controller_t *keyboard_1 = G_Controller_Create(CONTROLLER_KEYBOARD_1);
-  G_Controllers_Attach(keyboard_1);
-  g_controller_t *keyboard_2 = G_Controller_Create(CONTROLLER_KEYBOARD_2);
-  G_Controllers_Attach(keyboard_2);
-
   // TODO: Attach the controller to the player(s)
 
   K_InitKeymap();
@@ -56,6 +49,13 @@ int main() {
   if (!R_Init(W_Get(), &game_state)) {
     return 1;
   }
+
+  G_Controllers_Init();
+  g_controller_t *controller_player_1 = G_Controller_Create(CONTROLLER_GAMEPAD_1);
+  // g_controller_t *controller_player_1 = G_Controller_Create(CONTROLLER_KEYBOARD_1);
+  G_Controllers_Attach(controller_player_1);
+  g_controller_t *controller_player_2 = G_Controller_Create(CONTROLLER_KEYBOARD_2);
+  G_Controllers_Attach(controller_player_2);
 
   P_EntityManager_Init();
 
@@ -72,11 +72,11 @@ int main() {
       }, 10);
   }
 
-  P_Player_Spawn("Emma", keyboard_2, (vec2_t) {
+  P_Player_Spawn("Emma", controller_player_1, (vec2_t) {
     400, 200
   }, 0xFFFF0000);
 
-  P_Player_Spawn("Bob", keyboard_1, (vec2_t) {
+  P_Player_Spawn("Bob", controller_player_2, (vec2_t) {
     200, 200
   }, 0xFF00FF00);
 

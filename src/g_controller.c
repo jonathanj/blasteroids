@@ -1,4 +1,5 @@
 #include "g_controller.h"
+#include "m_message.h"
 
 // TODO
 
@@ -72,11 +73,13 @@ void G_Controllers_HandleEvent(const SDL_Event *event) {
 }
 
 bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event);
+bool G_Controller_Gamepad_HandleEvent(g_controller_t *controller, const SDL_Event *event);
 
 g_controller_t *G_Controller_Create(g_controller_type type) {
   g_controller_t *controller = malloc(sizeof(g_controller_t));
   SDL_assert(controller != NULL);
-
+  controller->device = NULL;
+  controller->device_id = -1;
   controller->input_state = (g_controller_input_state_t){
     .movement = {0, 0},
     .thrust = 0,
@@ -92,8 +95,17 @@ g_controller_t *G_Controller_Create(g_controller_type type) {
       controller->keymap = &KEYBOARD2_KEYMAP;
       break;
     case CONTROLLER_MOUSE:
-    case CONTROLLER_GAMEPAD:
       SDL_assert(false);
+    case CONTROLLER_GAMEPAD_1:
+      SDL_assert(SDL_NumJoysticks() > 0);
+      SDL_assert(SDL_IsGameController(0));
+      SDL_GameController *gamecontroller = SDL_GameControllerOpen(0);
+      SDL_assert(gamecontroller);
+      M_Log("[Game/Controller] Found game controller \"%s\"\n", SDL_GameControllerName(gamecontroller));
+      controller->handle_event = G_Controller_Gamepad_HandleEvent;
+      controller->device = gamecontroller;
+      controller->device_id = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamecontroller));
+      SDL_GameControllerEventState(SDL_ENABLE);
       break;
   }
 
@@ -102,6 +114,7 @@ g_controller_t *G_Controller_Create(g_controller_type type) {
 
 void G_Controller_Free(g_controller_t *controller) {
   if (controller) {
+    // TODO: free/close device
     free(controller);
   }
 }
@@ -132,4 +145,44 @@ bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Eve
   // TODO: We need to return false here, otherwise the other keyboard controller
   // can't process keys.
   return false;
+}
+
+// A 10% deadzone.
+const int16_t CONTROLLER_DEADZONE = 3276;
+
+float normalize_gamepad_axis(int16_t value) {
+  if (abs(value) < CONTROLLER_DEADZONE) {
+    return 0.0f;
+  } else {
+    return value / 32768.0f;
+  }
+}
+
+bool G_Controller_Gamepad_HandleEvent(g_controller_t *controller, const SDL_Event *event) {
+  if (event->type != SDL_CONTROLLERAXISMOTION
+    && event->type != SDL_CONTROLLERBUTTONDOWN
+    && event->type != SDL_CONTROLLERBUTTONUP
+    && event->type != SDL_JOYAXISMOTION) {
+    return false;
+  }
+
+  g_controller_input_state_t *input_state = &controller->input_state;
+
+  switch (event->type) {
+    case SDL_CONTROLLERAXISMOTION:
+      if (event->caxis.which != controller->device_id) {
+        // The event is not for this game controller;
+        return false;
+      }
+      switch (event->caxis.axis) {
+        case SDL_CONTROLLER_AXIS_LEFTX:
+          input_state->movement.x = normalize_gamepad_axis(event->caxis.value);
+          break;
+        case SDL_CONTROLLER_AXIS_LEFTY:
+          input_state->thrust = -normalize_gamepad_axis(SDL_min(0, event->caxis.value));
+          break;
+      }
+  }
+
+  return true;
 }
