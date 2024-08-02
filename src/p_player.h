@@ -4,6 +4,10 @@
 #include "vec2.h"
 #include "g_game_state.h"
 
+void P_Player_Spawn(const char *name, vec2_t position);
+
+/////////////
+
 typedef struct player {
   vec2_t pos;
   vec2_t velocity;

@@ -1,7 +1,11 @@
 #include <SDL2/SDL.h>
 #include "g_game_state.h"
 
-game_state_t G_Init(const uint32_t screen_width, const uint32_t screen_height, uint8_t target_fps) {
+game_state_t G_Init(
+  const uint32_t screen_width,
+  const uint32_t screen_height,
+  const uint8_t target_fps
+) {
   game_state_t game_state = {
     .screen_width = screen_width,
     .screen_height = screen_height,
@@ -9,6 +13,8 @@ game_state_t G_Init(const uint32_t screen_width, const uint32_t screen_height, u
     .target_frame_time = 1.0 / (double)target_fps,
     .delta_time = 0,
     .is_running = true,
+    // FIXME
+    .world = {.width = 1024 / 2, .height = 768 / 2},
   };
   game_state.delta_time = game_state.target_frame_time;
   return game_state;

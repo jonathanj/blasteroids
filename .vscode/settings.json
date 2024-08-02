@@ -7,7 +7,12 @@
     "sdl.h": "c",
     "stdint.h": "c",
     "w_window.h": "c",
-    "k_keyboard.h": "c"
+    "k_keyboard.h": "c",
+    "string.h": "c",
+    "a_bitmap.h": "c",
+    "g_game_state.h": "c",
+    "m_message.h": "c",
+    "m_physics.h": "c"
   },
   "C_Cpp.default.compilerPath": "C:\\msys64\\ucrt64\\bin\\gcc.exe"
 }

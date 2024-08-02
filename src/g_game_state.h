@@ -4,6 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef struct {
+  uint32_t width;
+  uint32_t height;
+} world_t;
+
 typedef struct game_state {
   uint32_t screen_width;
   uint32_t screen_height;
@@ -11,9 +16,14 @@ typedef struct game_state {
   double target_frame_time;
   double delta_time;
   bool is_running;
+
+  world_t world;
+
+  // TODO: world state (asteroids etc)
+  // TODO: player(s) state
 } game_state_t;
 
-game_state_t G_Init(const uint32_t screen_width, const uint32_t screen_height, uint8_t target_fps);
+game_state_t G_Init(const uint32_t screen_width, const uint32_t screen_height, const uint8_t target_fps);
 void G_FrameStart();
 void G_FrameEnd(game_state_t *game_state);
 

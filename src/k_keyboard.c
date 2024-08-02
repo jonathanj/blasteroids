@@ -4,12 +4,12 @@ keymap_t keymap;
 keymap_state_t keymap_state;
 
 void K_InitKeymap() {
-  keymap.turn_left = SDL_SCANCODE_A;
-  keymap.turn_right = SDL_SCANCODE_D;
-  keymap.forward = SDL_SCANCODE_W;
-  // keymap.turn_left = SDL_SCANCODE_LEFT;
-  // keymap.turn_right = SDL_SCANCODE_RIGHT;
-  // keymap.forward = SDL_SCANCODE_UP;
+  // keymap.turn_left = SDL_SCANCODE_A;
+  // keymap.turn_right = SDL_SCANCODE_D;
+  // keymap.forward = SDL_SCANCODE_W;
+  keymap.turn_left = SDL_SCANCODE_LEFT;
+  keymap.turn_right = SDL_SCANCODE_RIGHT;
+  keymap.forward = SDL_SCANCODE_UP;
   // keymap.backward = SDL_SCANCODE_S;
   //keymap.strafe_left = SDL_SCANCODE_A;
   //keymap.strafe_right = SDL_SCANCODE_D;
@@ -38,32 +38,24 @@ void K_HandleEvents(game_state_t *game_state, player_t *player) {
 
 #define M_PI    3.14159265358979323846264338327950288
 #define M_HALF_PI 1.57079632679
-const float TURN_RATE = M_PI;
+const float PLAYER_TURN_RATE = M_PI;
+const float PLAYER_ACCEL_RATE = 100;
 
 // NOTE: I don't like that the keyboard has to know about the player.
 void K_ProcessKeyStates(player_t *player, double delta_time) {
   if (keymap_state.forward) {
     float theta = player->dir_angle - M_HALF_PI;
-    player->accel.x = 100 * SDL_cos(theta);
-    player->accel.y = 100 * SDL_sin(theta);
+    player->accel.x = PLAYER_ACCEL_RATE * SDL_cos(theta);
+    player->accel.y = PLAYER_ACCEL_RATE * SDL_sin(theta);
   } else {
     player->accel.x = 0;
     player->accel.y = 0;
   }
-  // if (keymap_state.backward) {
-  //   player->pos.y += 40 * delta_time;
-  // }
-  // if (keymap_state.strafe_left) {
-  //   player->pos.x -= 40 * delta_time;
-  // }
-  // if (keymap_state.strafe_right) {
-  //   player->pos.x += 40 * delta_time;
-  // }
   if (keymap_state.turn_left) {
-    player->dir_angle -= TURN_RATE * delta_time;
+    player->dir_angle -= PLAYER_TURN_RATE * delta_time;
   }
   if (keymap_state.turn_right) {
-    player->dir_angle += TURN_RATE * delta_time;
+    player->dir_angle += PLAYER_TURN_RATE * delta_time;
   }
 }
 

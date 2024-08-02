@@ -18,14 +18,8 @@ all: $(TARGET)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-#build:
-#	gcc -Wall -Wextra -Werror -std=c99 -pedantic -g -I"C:/msys64/mingw64/include" -L"C:/msys64/mingw64/lib" src/*.c -w -mconsole -lmingw32 -lSDL2 -LSDL2main -o rasterizer
-
 $(TARGET): $(OBJECTS)
 	$(CC) $(foreach X,$(LIB_DIRS),-L$(X)) -w -mconsole -o $@ $^ -lmingw32 -lSDL2 -LSDL2main 
-
-#%.o: %.c
-#	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SRC_DIRS)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c -o $@ $<
