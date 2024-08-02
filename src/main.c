@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "g_game_state.h"
+#include "g_controller.h"
 #include "r_renderer.h"
 #include "k_keyboard.h"
 #include "w_window.h"
@@ -19,8 +20,8 @@ void GameLoop(game_state_t *game_state, player_t *player) {
   while (game_state->is_running) {
     G_FrameStart();
 
-    // input_state_t *input_state = K_HandleEvents(game_state, player);
-    K_HandleEvents(game_state, player);
+    // K_HandleEvents(game_state, player);
+    G_HandleEvents(game_state);
     P_Think(player, game_state);
     P_EntityManager_Think(game_state);
 
@@ -34,12 +35,19 @@ float random_float() {
   return (float)rand() / (float)RAND_MAX;
 }
 
-//int main(int argc, char *argv[]) {
 int main() {
   srand((uint32_t)time(NULL));
 
   game_state_t game_state = G_Init(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, FPS);
   player_t player = P_Init(200, 200, 0);
+
+  G_Controllers_Init();
+  g_controller_t *keyboard_1 = G_Controller_Create(CONTROLLER_KEYBOARD_1);
+  G_Controllers_Attach(keyboard_1);
+  g_controller_t *keyboard_2 = G_Controller_Create(CONTROLLER_KEYBOARD_2);
+  G_Controllers_Attach(keyboard_2);
+
+  // TODO: Attach the controller to the player(s)
 
   K_InitKeymap();
   if (!W_Init(SCREEN_WIDTH, SCREEN_HEIGHT)) {
@@ -64,12 +72,13 @@ int main() {
       }, 10);
   }
 
-  P_Player_Spawn("Bob", (vec2_t) {
+  P_Player_Spawn("Bob", keyboard_1, (vec2_t) {
     400, 200
   });
 
   GameLoop(&game_state, &player);
 
+  G_Controllers_Shutdown();
   P_EntityManager_Shutdown();
   R_Shutdown();
   W_Shutdown();

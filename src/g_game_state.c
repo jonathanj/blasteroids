@@ -1,5 +1,7 @@
 #include <SDL2/SDL.h>
+
 #include "g_game_state.h"
+#include "g_controller.h"
 
 game_state_t G_Init(
   const uint32_t screen_width,
@@ -32,5 +34,20 @@ void G_FrameEnd(game_state_t *state) {
   if (state->delta_time < state->target_frame_time) {
     SDL_Delay((state->target_frame_time - state->delta_time) * 1000.0);
     state->delta_time = state->target_frame_time;
+  }
+}
+
+void G_HandleEvents(game_state_t *state) {
+  SDL_Event event;
+
+  while (SDL_PollEvent(&event)) {
+    switch (event.type) {
+      case SDL_QUIT:
+        state->is_running = false;
+        break;
+      default:
+        G_Controllers_HandleEvent(&event);
+        break;
+    }
   }
 }

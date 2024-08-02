@@ -18,13 +18,11 @@ typedef struct game_state {
   bool is_running;
 
   world_t world;
-
-  // TODO: world state (asteroids etc)
-  // TODO: player(s) state
 } game_state_t;
 
 game_state_t G_Init(const uint32_t screen_width, const uint32_t screen_height, const uint8_t target_fps);
 void G_FrameStart();
 void G_FrameEnd(game_state_t *game_state);
+void G_HandleEvents(game_state_t *state);
 
 #endif

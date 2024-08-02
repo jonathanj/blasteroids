@@ -3,10 +3,12 @@
 #include "p_entity.h"
 #include "m_message.h"
 #include "r_renderer.h"
+#include "g_controller.h"
 
 #define PLAYER_DEATH_INVULNERABLE_TIME_SECONDS 2.0f;
 
 typedef struct {
+  const g_controller_t *controller;
   const char *name;
   float invulnerable_time;
 } p_player_t;
@@ -16,7 +18,7 @@ void P_Player_Think(p_entity_t *entity, const game_state_t *state);
 bool P_Player_Collided(p_entity_t *entity, p_entity_t *other);
 void P_Player_Render(p_entity_t *entity);
 
-void P_Player_Spawn(const char *name, vec2_t position) {
+void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t position) {
   vec2_t velocity = { 0, 0 };
   m_contact_body_t body = {
     .accel = {0, 0},
@@ -37,6 +39,7 @@ void P_Player_Spawn(const char *name, vec2_t position) {
     M_Log("[Entity/Player] Unable to spawn player\n");
     return;
   }
+  player->controller = controller;
   player->name = name;
   player->invulnerable_time = 0.0f;
   entity->data = (void *)player;
@@ -68,13 +71,13 @@ bool P_Player_Collided(p_entity_t *entity, p_entity_t *other) {
 
   switch (other->type) {
     case ENTITY_ASTEROID: {
-      // TODO: Implement real logic.
-      entity->dir_angle += 0.39;
-      player->invulnerable_time = PLAYER_DEATH_INVULNERABLE_TIME_SECONDS;
-      break;
+        // TODO: Implement real logic.
+        entity->dir_angle += 0.39;
+        player->invulnerable_time = PLAYER_DEATH_INVULNERABLE_TIME_SECONDS;
+        break;
     default:
       break;
-    }
+      }
   }
 
   return true;

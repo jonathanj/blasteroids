@@ -47,6 +47,7 @@ void P_EntityManager_ThinkEntity(void *data, void *extra) {
     entity->think(entity, state);
   }
 
+  // FIXME: should all entities think first, then simulate physics, then check collisions?
   M_Physics_SimulateStep(&entity->contact_body, (const world_t *)&state->world, state->delta_time);
 }
 

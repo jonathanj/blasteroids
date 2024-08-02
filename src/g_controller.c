@@ -29,28 +29,51 @@ Things to consider:
 
 */
 
-typedef enum {
-  CONTROLLER_KEYBOARD_1,
-  CONTROLLER_KEYBOARD_2,
-  CONTROLLER_MOUSE,
-  CONTROLLER_GAMEPAD,
-} g_controller_type;
 
-typedef struct {
-  vec2_t movement;
-  float thrust;
-} g_controller_input_state_t;
-
-typedef struct g_controller_t g_controller_t;
-
-struct g_controller_t {
-  g_controller_input_state_t input_state;
-  void(*handle_event)(g_controller_t *controller, const SDL_Event *event);
+static const struct g_controller_keymap_t KEYBOARD1_KEYMAP = {
+  .thrust = SDL_SCANCODE_W,
+  .turn_left = SDL_SCANCODE_A,
+  .turn_right = SDL_SCANCODE_D,
 };
 
-void G_Controller_Keyboard1_HandleEvent();
+static const struct g_controller_keymap_t KEYBOARD2_KEYMAP = {
+  .thrust = SDL_SCANCODE_UP,
+  .turn_left = SDL_SCANCODE_LEFT,
+  .turn_right = SDL_SCANCODE_RIGHT,
+};
 
-g_controller_t *G_Controller_Init(g_controller_type type) {
+static linked_list_node_t *controllers = NULL;
+
+void G_Controllers_Init() {
+  controllers = linked_list_new(NULL);
+}
+
+void G_Controllers_Shutdown() {
+  for (linked_list_node_t *node = controllers; node->next != NULL; node = node->next) {
+    G_Controller_Free(node->data);
+  }
+
+  if (controllers) {
+    linked_list_free(controllers);
+  }
+}
+
+void G_Controllers_Attach(g_controller_t *controller) {
+  linked_list_append(controllers, controller);
+}
+
+void G_Controllers_HandleEvent(const SDL_Event *event) {
+  for (linked_list_node_t *node = controllers; node->next != NULL; node = node->next) {
+    g_controller_t *controller = node->data;
+    if (controller != NULL) {
+      controller->handle_event(controller, event);
+    }
+  }
+}
+
+void G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event);
+
+g_controller_t *G_Controller_Create(g_controller_type type) {
   g_controller_t *controller = malloc(sizeof(g_controller_t));
   SDL_assert(controller != NULL);
 
@@ -61,9 +84,13 @@ g_controller_t *G_Controller_Init(g_controller_type type) {
 
   switch (type) {
     case CONTROLLER_KEYBOARD_1:
-      controller->handle_event = G_Controller_Keyboard1_HandleEvent;
+      controller->handle_event = G_Controller_Keyboard_HandleEvent;
+      controller->keymap = &KEYBOARD1_KEYMAP;
       break;
     case CONTROLLER_KEYBOARD_2:
+      controller->handle_event = G_Controller_Keyboard_HandleEvent;
+      controller->keymap = &KEYBOARD2_KEYMAP;
+      break;
     case CONTROLLER_MOUSE:
     case CONTROLLER_GAMEPAD:
       SDL_assert(false);
@@ -73,14 +100,6 @@ g_controller_t *G_Controller_Init(g_controller_type type) {
   return controller;
 }
 
-void G_Controller_HandleEvent(linked_list_node_t *controllers, const SDL_Event *event) {
-  for (linked_list_node_t *node = controllers; node->next != NULL; node = node->next) {
-    g_controller_t *controller = node->data;
-    if (controller->can_handle_event(controller, event)) {
-      controller->handle_event(controller, event);
-    }
-  }
-}
 
 void G_Controller_Free(g_controller_t *controller) {
   if (controller) {
@@ -88,26 +107,26 @@ void G_Controller_Free(g_controller_t *controller) {
   }
 }
 
-void G_Controller_Keyboard1_HandleEvent(g_controller_t *controller, const SDL_Event *event) {
-  // TODO: How does one controller not handle another controller's input?
-  // For example, how does one controller not handle WASD while the other controller does not handle UDLR?
-  // Maybe the controller has a keymap?
-  // Gamepads have an instance ID, how does it use a keymap? Maybe keymap is a pointer and can be NULL?
-  if (event->type != SDL_KEYDOWN || event->type != SDL_KEYUP) {
+void G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event) {
+  if (event->type != SDL_KEYDOWN && event->type != SDL_KEYUP) {
+    // Not a key event, ignore.
     return;
   }
+
+  g_controller_keymap_t *keymap = controller->keymap;
+  SDL_assert(keymap != NULL);
 
   SDL_Scancode scancode = event->key.keysym.scancode;
   bool pressed = event->type == SDL_KEYDOWN;
   g_controller_input_state_t *input_state = &controller->input_state;
 
-  if (scancode == SDL_SCANCODE_W) {
+  if (scancode == keymap->thrust) {
     input_state->thrust = pressed ? 1.0f : 0.0f;
   }
 
-  if (scancode == SDL_SCANCODE_A) {
-    input_state->movement.x = -1.0f;
-  } else if (scancode == SDL_SCANCODE_D) {
-    input_state->movement.x = 1.0f;
+  if (scancode == keymap->turn_left) {
+    input_state->movement.x = pressed ? -1.0f : 0.0f;
+  } else if (scancode == keymap->turn_right) {
+    input_state->movement.x = pressed ? 1.0f : 0.0f;
   }
 }
