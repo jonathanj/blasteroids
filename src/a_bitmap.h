@@ -10,6 +10,8 @@ typedef struct {
   uint32_t height;
   uint32_t bpp;
   uint32_t stride;
+  uint32_t color_table_length;
+  uint32_t *color_table;
 } bitmap_t;
 
 bitmap_t *A_Bitmap_ReadFile(const char *path);

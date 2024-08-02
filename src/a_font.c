@@ -27,8 +27,8 @@ void A_Font_Copy_Glyph_Bitmap1(
       uint32_t x = glyph->x + offset_x;
       uint32_t byte_index = (inverted_y * bitmap->stride) + (x / 8);
       uint8_t bit_index = 7 - (x % 8);
-      uint8_t pixel = (bitmap->data[byte_index] >> bit_index) & 1;
-      // TODO: inverted
+      uint8_t color_idx = (bitmap->data[byte_index] >> bit_index) & 1;
+      uint32_t pixel = bitmap->color_table[color_idx];
       if (!pixel) {
         uint32_t pixel_index = y * bitmap->width + x;
         pixel_data[pixel_index] = 0xFF;
@@ -60,7 +60,9 @@ font_t *A_Font_ReadConfig(const char *path) {
   char value[BUF_MAX_SIZE];
   char line[LINE_MAX_SIZE];
   bitmap_t *bitmap = NULL;
+  size_t line_number = 0;
   while (fgets(line, LINE_MAX_SIZE, file)) {
+    ++line_number;
     if (strncmp(line, "\r\n", 2) == 0 || strncmp(line, "\n", 1) == 0) {
       mode = PARSING_MODE_GLYPHS;
       continue;
@@ -69,7 +71,7 @@ font_t *A_Font_ReadConfig(const char *path) {
     switch (mode) {
       case PARSING_MODE_DESCRIPTORS: {
         if (sscanf(line, "%s %s", key, value) == -1) {
-          M_Log("[Asset/Font] Could not parse line\n");
+          M_Log("[Asset/Font] Could not parse line %d:\n  %s\n", line_number, line);
           return NULL;
         }
 

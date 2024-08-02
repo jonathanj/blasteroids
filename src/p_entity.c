@@ -100,6 +100,7 @@ void P_EntityManager_CheckCollisions() {
         }
 
         if (resolve_a && resolve_b) {
+          M_Log("[Entity/Manager] %s collided with %s\n", P_EntityManager_NameByType(entity_a->type), P_EntityManager_NameByType(entity_b->type));
           M_Physics_ResolveCollision(&contact);
         }
       }

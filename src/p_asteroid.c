@@ -39,8 +39,7 @@ void P_Asteroid_Spawn(vec2_t position, vec2_t velocity, uint32_t size) {
   asteroid->size = size;
 }
 
-bool P_Asteroid_Collided(p_entity_t *entity, p_entity_t *other) {
-  M_Log("[Entity/Asteroid] %s collided with %s\n", P_EntityManager_NameByType(entity->type), P_EntityManager_NameByType(other->type));
+bool P_Asteroid_Collided(p_entity_t *entity SDL_UNUSED, p_entity_t *other SDL_UNUSED) {
   return true;
 }
 
@@ -50,7 +49,8 @@ void P_Asteroid_Render(p_entity_t *entity) {
 
   vec2_t position = entity->contact_body.position;
   R_DrawCircle((uint32_t)position.x, (uint32_t)position.y, asteroid->size, 0xFFFFFFFF);
-  R_DrawText((uint32_t)position.x, (uint32_t)position.y, "%0.f,%0.f", position.x, position.y);
+  //R_DrawText((uint32_t)position.x, (uint32_t)position.y, "%0.f,%0.f", position.x, position.y);
+  R_DrawSmallText((uint32_t)position.x, (uint32_t)position.y + 12, "%0.f,%0.f", position.x, position.y);
 }
 
 void P_Asteroid_Destroy(void *data) {

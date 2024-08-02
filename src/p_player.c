@@ -3,13 +3,13 @@
 #include "p_entity.h"
 #include "m_message.h"
 #include "r_renderer.h"
-#include "g_controller.h"
 
 #define PLAYER_DEATH_INVULNERABLE_TIME_SECONDS 2.0f;
 
 typedef struct {
   const g_controller_t *controller;
   const char *name;
+  uint32_t color;
   float invulnerable_time;
 } p_player_t;
 
@@ -18,7 +18,7 @@ void P_Player_Think(p_entity_t *entity, const game_state_t *state);
 bool P_Player_Collided(p_entity_t *entity, p_entity_t *other);
 void P_Player_Render(p_entity_t *entity);
 
-void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t position) {
+void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t position, uint32_t color) {
   vec2_t velocity = { 0, 0 };
   m_contact_body_t body = {
     .accel = {0, 0},
@@ -26,7 +26,7 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
     .velocity = velocity,
     .restitution = 0.9f,
     .inv_mass = 1 / (float)5.0f,
-    .radius = 10.f,
+    .radius = 5.0f,
   };
   p_entity_t *entity = P_EntityManager_Spawn(ENTITY_PLAYER, body, 0.0);
   if (entity == NULL) {
@@ -41,6 +41,7 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
   }
   player->controller = controller;
   player->name = name;
+  player->color = color;
   player->invulnerable_time = 0.0f;
   entity->data = (void *)player;
 
@@ -50,17 +51,38 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
   entity->collided = P_Player_Collided;
 }
 
+// TODO: move these somewhere
+#define M_PI    3.14159265358979323846264338327950288
+#define M_HALF_PI 1.57079632679
+const float PLAYER_TURN_RATE = M_PI;
+const float PLAYER_ACCEL_RATE = 100;
+
 void P_Player_Think(p_entity_t *entity, const game_state_t *state) {
   p_player_t *player = entity->data;
   SDL_assert(player != NULL);
 
+  float dt = state->delta_time;
+
   if (player->invulnerable_time > 0.0f) {
-    player->invulnerable_time = SDL_max(player->invulnerable_time - state->delta_time, 0);
+    player->invulnerable_time = SDL_max(player->invulnerable_time - dt, 0);
   }
+
+  // Process input.
+  const g_controller_input_state_t *input_state = &player->controller->input_state;
+  float thrust = input_state->thrust;
+  if (thrust > 0) {
+    float theta = entity->dir_angle - M_HALF_PI;
+    entity->contact_body.accel.x = thrust * PLAYER_ACCEL_RATE * SDL_cos(theta);
+    entity->contact_body.accel.y = thrust * PLAYER_ACCEL_RATE * SDL_sin(theta);
+  } else {
+    entity->contact_body.accel.x = 0;
+    entity->contact_body.accel.y = 0;
+  }
+
+  entity->dir_angle += input_state->movement.x * PLAYER_TURN_RATE * dt;
 }
 
 bool P_Player_Collided(p_entity_t *entity, p_entity_t *other) {
-  M_Log("[Entity/Player] %s collided with %s\n", P_EntityManager_NameByType(entity->type), P_EntityManager_NameByType(other->type));
   p_player_t *player = entity->data;
   SDL_assert(player != NULL);
 
@@ -70,17 +92,16 @@ bool P_Player_Collided(p_entity_t *entity, p_entity_t *other) {
   }
 
   switch (other->type) {
-    case ENTITY_ASTEROID: {
-        // TODO: Implement real logic.
-        entity->dir_angle += 0.39;
-        player->invulnerable_time = PLAYER_DEATH_INVULNERABLE_TIME_SECONDS;
-        break;
+    case ENTITY_ASTEROID:
+      // TODO: Implement real logic.
+      entity->dir_angle += 0.39;
+      player->invulnerable_time = PLAYER_DEATH_INVULNERABLE_TIME_SECONDS;
+      return true;
+    case ENTITY_PLAYER:
+      return true;
     default:
-      break;
-      }
+      return false;
   }
-
-  return true;
 }
 
 void P_Player_Render(p_entity_t *entity) {
@@ -114,7 +135,7 @@ void P_Player_Render(p_entity_t *entity) {
     vec2_irotate(&vs[i], entity->dir_angle);
     vec2_iadd(&vs[i], &body->position);
   }
-  uint32_t player_color = player->invulnerable_time > 0 ? 0xFFFFFFFF : 0xFF0000FF;
+  uint32_t player_color = player->invulnerable_time > 0 ? 0xFFFFFFFF : player->color;
   R_DrawWireframe(vs, vs_count, player_color);
 
   uint32_t name_x = (strlen(player->name) / 2.0f) * 6;

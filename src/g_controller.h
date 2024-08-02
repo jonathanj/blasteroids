@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <SDL2/SDL.h>
 
 #include "linked_list.h"
 #include "vec2.h"
@@ -29,8 +30,8 @@ typedef struct g_controller_t g_controller_t;
 
 struct g_controller_t {
   g_controller_input_state_t input_state;
-  g_controller_keymap_t *keymap;
-  void (*handle_event)(g_controller_t *controller, const SDL_Event *event);
+  const g_controller_keymap_t *keymap;
+  bool (*handle_event)(g_controller_t *controller, const SDL_Event *event);
 };
 
 void G_Controllers_Init();

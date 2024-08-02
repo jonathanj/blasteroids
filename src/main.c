@@ -14,18 +14,18 @@
 
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 768
-#define FPS 30
+#define FPS 60
 
-void GameLoop(game_state_t *game_state, player_t *player) {
+void GameLoop(game_state_t *game_state) {
   while (game_state->is_running) {
     G_FrameStart();
 
     // K_HandleEvents(game_state, player);
     G_HandleEvents(game_state);
-    P_Think(player, game_state);
+    // P_Think(player, game_state);
     P_EntityManager_Think(game_state);
 
-    R_Render(game_state, player);
+    R_Render(game_state, NULL);
 
     G_FrameEnd(game_state);
   }
@@ -39,7 +39,7 @@ int main() {
   srand((uint32_t)time(NULL));
 
   game_state_t game_state = G_Init(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, FPS);
-  player_t player = P_Init(200, 200, 0);
+  // player_t player = P_Init(200, 200, 0);
 
   G_Controllers_Init();
   g_controller_t *keyboard_1 = G_Controller_Create(CONTROLLER_KEYBOARD_1);
@@ -72,11 +72,15 @@ int main() {
       }, 10);
   }
 
-  P_Player_Spawn("Bob", keyboard_1, (vec2_t) {
+  P_Player_Spawn("Emma", keyboard_2, (vec2_t) {
     400, 200
-  });
+  }, 0xFFFF0000);
 
-  GameLoop(&game_state, &player);
+  P_Player_Spawn("Bob", keyboard_1, (vec2_t) {
+    200, 200
+  }, 0xFF00FF00);
+
+  GameLoop(&game_state);
 
   G_Controllers_Shutdown();
   P_EntityManager_Shutdown();

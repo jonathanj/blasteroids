@@ -12,7 +12,8 @@
     "a_bitmap.h": "c",
     "g_game_state.h": "c",
     "m_message.h": "c",
-    "m_physics.h": "c"
+    "m_physics.h": "c",
+    "linked_list.h": "c"
   },
   "C_Cpp.default.compilerPath": "C:\\msys64\\ucrt64\\bin\\gcc.exe"
 }

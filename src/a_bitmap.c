@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "a_bitmap.h"
 #include "m_message.h"
@@ -62,6 +63,22 @@ bitmap_t *A_Bitmap_ReadFile(const char *path) {
     return NULL;
   }
 
+  uint32_t palette_count = info_header.palette_count == 0 && info_header.bpp <= 8
+    ? (1 << info_header.bpp)
+    : 0;
+
+  uint32_t *color_table = NULL;
+  if (palette_count > 0) {
+    color_table = malloc(sizeof(uint32_t) * palette_count);
+    //memset(color_table, 0, sizeof(uint32_t) * palette_count);
+    fread(color_table, sizeof(uint32_t) * palette_count, 1, file);
+    if (ferror(file)) {
+      free(color_table);
+      M_Log("[A_Bitmap] Read bitmap color table failed\n");
+      return NULL;
+    }
+  }
+
   if (fseek(file, file_header.offset, SEEK_SET) != 0) {
     fclose(file);
     M_Log("[A_Bitmap] File seeking failed\n");
@@ -97,6 +114,8 @@ bitmap_t *A_Bitmap_ReadFile(const char *path) {
   bitmap->width = info_header.width;
   bitmap->height = info_header.height;
   bitmap->bpp = info_header.bpp;
+  bitmap->color_table_length = palette_count;
+  bitmap->color_table = color_table;
   uint32_t bytes_per_row = (info_header.width + 7) / 8;
   bitmap->stride = (bytes_per_row + 3) & ~3;
 
@@ -105,9 +124,7 @@ bitmap_t *A_Bitmap_ReadFile(const char *path) {
 
 void A_Bitmap_Free(bitmap_t *bitmap) {
   if (bitmap != NULL) {
-    if (bitmap->data) {
-      free(bitmap->data);
-      bitmap->data = NULL;
-    }
+    if (bitmap->data) free(bitmap->data);
+    if (bitmap->color_table) free(bitmap->color_table);
   }
 }

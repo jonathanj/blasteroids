@@ -1,5 +1,3 @@
-#include <SDL2/SDL.h>
-
 #include "g_controller.h"
 
 // TODO
@@ -30,13 +28,13 @@ Things to consider:
 */
 
 
-static const struct g_controller_keymap_t KEYBOARD1_KEYMAP = {
+static const g_controller_keymap_t KEYBOARD1_KEYMAP = {
   .thrust = SDL_SCANCODE_W,
   .turn_left = SDL_SCANCODE_A,
   .turn_right = SDL_SCANCODE_D,
 };
 
-static const struct g_controller_keymap_t KEYBOARD2_KEYMAP = {
+static const g_controller_keymap_t KEYBOARD2_KEYMAP = {
   .thrust = SDL_SCANCODE_UP,
   .turn_left = SDL_SCANCODE_LEFT,
   .turn_right = SDL_SCANCODE_RIGHT,
@@ -63,23 +61,25 @@ void G_Controllers_Attach(g_controller_t *controller) {
 }
 
 void G_Controllers_HandleEvent(const SDL_Event *event) {
-  for (linked_list_node_t *node = controllers; node->next != NULL; node = node->next) {
+  for (linked_list_node_t *node = controllers; node != NULL; node = node->next) {
     g_controller_t *controller = node->data;
     if (controller != NULL) {
-      controller->handle_event(controller, event);
+      if (controller->handle_event(controller, event)) {
+        break;
+      }
     }
   }
 }
 
-void G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event);
+bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event);
 
 g_controller_t *G_Controller_Create(g_controller_type type) {
   g_controller_t *controller = malloc(sizeof(g_controller_t));
   SDL_assert(controller != NULL);
 
-  controller->input_state = {
+  controller->input_state = (g_controller_input_state_t){
     .movement = {0, 0},
-    .menu = false,
+    .thrust = 0,
   };
 
   switch (type) {
@@ -100,20 +100,19 @@ g_controller_t *G_Controller_Create(g_controller_type type) {
   return controller;
 }
 
-
 void G_Controller_Free(g_controller_t *controller) {
   if (controller) {
     free(controller);
   }
 }
 
-void G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event) {
+bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event) {
   if (event->type != SDL_KEYDOWN && event->type != SDL_KEYUP) {
     // Not a key event, ignore.
-    return;
+    return false;
   }
 
-  g_controller_keymap_t *keymap = controller->keymap;
+  const g_controller_keymap_t *keymap = controller->keymap;
   SDL_assert(keymap != NULL);
 
   SDL_Scancode scancode = event->key.keysym.scancode;
@@ -129,4 +128,8 @@ void G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Eve
   } else if (scancode == keymap->turn_right) {
     input_state->movement.x = pressed ? 1.0f : 0.0f;
   }
+
+  // TODO: We need to return false here, otherwise the other keyboard controller
+  // can't process keys.
+  return false;
 }
