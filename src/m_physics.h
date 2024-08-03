@@ -25,6 +25,7 @@ typedef struct {
   m_contact_body_t *a;
   m_contact_body_t *b;
   vec2_t normal;
+  float depth;
 } m_contact_t;
 
 bool M_Physics_CheckCircleCollision(m_contact_body_t *a, m_contact_body_t *b, m_contact_t *contact_out);

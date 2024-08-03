@@ -19,6 +19,11 @@ vec2_t vec2_sub(const vec2_t *a, const vec2_t *b) {
   vec2_t v = { .x = a->x - b->x, .y = a->y - b->y };
   return v;
 }
+void vec2_isub(vec2_t *v, const vec2_t *b) {
+  v->x -= b->x;
+  v->y -= b->y;
+}
+
 vec2_t vec2_mul(const vec2_t *v, float factor) {
   vec2_t u = { .x = v->x * factor, .y = v->y * factor };
   return u;

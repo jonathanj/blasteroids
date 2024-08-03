@@ -16,8 +16,8 @@ void P_Asteroid_Spawn(vec2_t position, vec2_t velocity, uint32_t size) {
     .accel = {0, 0},
     .position = position,
     .velocity = velocity,
-    .restitution = 0.9f,
-    .inv_mass = 1 / ((float)size * 2.0f),
+    .restitution = 0.8f,
+    .inv_mass = 1 / ((float)size * 5.0f),
     .radius = (float)size,
   };
   p_entity_t *entity = P_EntityManager_Spawn(ENTITY_ASTEROID, body, 0.0);

@@ -7,10 +7,12 @@ bool M_Physics_CheckCircleCollision(m_contact_body_t *a, m_contact_body_t *b, m_
   if (a->radius > 0 && b->radius > 0) {
     vec2_t diff = vec2_sub(&a->position, &b->position);
     float dst = fabs(vec2_length(&diff));
-    if (dst < (a->radius + b->radius)) {
+    float dst_centers = a->radius + b->radius;
+    if (dst < dst_centers) {
       contact_out->a = a;
       contact_out->b = b;
       vec2_t normal = vec2_sub(&a->position, &b->position);
+      contact_out->depth = dst_centers - dst;
       vec2_normalize(&normal);
       contact_out->normal = normal;
       return true;
@@ -27,19 +29,23 @@ void M_Physics_ApplyImpulse(m_contact_body_t *body, vec2_t *impulse) {
 
 /// @brief Resolve a collision between two bodies.
 /// @see <https://www.youtube.com/watch?v=1L2g4ZqmFLQ>
+/// @see <https://chrishecker.com/images/e/e7/Gdmphys3.pdf>
 void M_Physics_ResolveCollision(m_contact_t *contact) {
-  // TODO: it's still possible for two bodies to overlap, and then continually
-  // interact. the overlap needs to be resolved.
   m_contact_body_t *a = contact->a;
   m_contact_body_t *b = contact->b;
+
+  // Resolve the overlap
+  vec2_t overlap = vec2_mul(&contact->normal, contact->depth * 0.5f);
+  vec2_iadd(&a->position, &overlap);
+  vec2_isub(&b->position, &overlap);
 
   // Elasticity
   float e = fminf(a->restitution, b->restitution);
 
   // Calculate the impulse vector, along the normal.
   vec2_t vrel = vec2_sub(&a->velocity, &b->velocity);
-  float impulse_mag = -(1.0f + e) * vec2_dot(&vrel, &contact->normal) / (a->inv_mass + b->inv_mass);
-  vec2_t impulse = vec2_mul(&contact->normal, impulse_mag);
+  float j = -(1.0f + e) * vec2_dot(&vrel, &contact->normal) / (a->inv_mass + b->inv_mass);
+  vec2_t impulse = vec2_mul(&contact->normal, j);
   vec2_t impulse_neg = vec2_mul(&impulse, -1.0f);
 
   M_Physics_ApplyImpulse(a, &impulse);

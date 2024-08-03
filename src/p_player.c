@@ -24,7 +24,7 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
     .accel = {0, 0},
     .position = position,
     .velocity = velocity,
-    .restitution = 0.9f,
+    .restitution = 0.3f,
     .inv_mass = 1 / (float)5.0f,
     .radius = 5.0f,
   };
@@ -140,6 +140,9 @@ void P_Player_Render(p_entity_t *entity) {
 
   uint32_t name_x = (strlen(player->name) / 2.0f) * 6;
   R_DrawText(body->position.x - name_x, body->position.y + 10, player->name);
+
+  // DEBUG: Draw collision circle.
+  // R_DrawCircle(body->position.x, body->position.y, body->radius, 0xFFFF00FF);
 }
 
 void P_Player_Destroy(void *data) {
