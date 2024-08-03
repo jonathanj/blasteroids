@@ -46,7 +46,12 @@ void G_HandleEvents(game_state_t *state) {
         state->is_running = false;
         break;
       default:
-        G_Controllers_HandleEvent(&event);
+        if (!G_Controllers_HandleEvent(&event)) {
+          // TODO: If the event wasn't handled by a controller, then maybe the
+          // game should try handle it?
+          //
+          // for example: pressing a key to join the game and spawn your player
+        }
         break;
     }
   }

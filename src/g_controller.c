@@ -1,34 +1,6 @@
 #include "g_controller.h"
 #include "m_message.h"
 
-// TODO
-
-/*
-
-Could be:
-
-- Keyboard region 1
-- Keyboard region 2
-- Mouse
-- Controller
-
-Controller needs to know what input it should read, and set the input state
-accordingly.
-
-This is more or less what k_keyboard.c does but directly, we need this indirectly.
-
-- init a controller type
-- controller type reads state from the input device
-- controller map/input state is set based on device inputs
-
-Things to consider:
-
-- analgoue inputs will handle up/down/left/right in a single vector, it might
-  be worth treating motion inputs as a vector regardless?
-
-*/
-
-
 static const g_controller_keymap_t KEYBOARD1_KEYMAP = {
   .thrust = SDL_SCANCODE_W,
   .turn_left = SDL_SCANCODE_A,
@@ -61,24 +33,28 @@ void G_Controllers_Attach(g_controller_t *controller) {
   linked_list_append(controllers, controller);
 }
 
-void G_Controllers_HandleEvent(const SDL_Event *event) {
+bool G_Controllers_HandleEvent(const SDL_Event *event) {
+  bool event_handled = false;
   for (linked_list_node_t *node = controllers; node != NULL; node = node->next) {
     g_controller_t *controller = node->data;
     if (controller != NULL) {
       if (controller->handle_event(controller, event)) {
-        break;
+        event_handled = true;
       }
     }
   }
+  return event_handled;
 }
 
 bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Event *event);
 bool G_Controller_Gamepad_HandleEvent(g_controller_t *controller, const SDL_Event *event);
+void G_Controller_Gamepad_Shutdown(g_controller_t *controller);
 
 g_controller_t *G_Controller_Create(g_controller_type type) {
   g_controller_t *controller = malloc(sizeof(g_controller_t));
   SDL_assert(controller != NULL);
   controller->device = NULL;
+  controller->shutdown = NULL;
   controller->device_id = -1;
   controller->input_state = (g_controller_input_state_t){
     .movement = {0, 0},
@@ -103,6 +79,7 @@ g_controller_t *G_Controller_Create(g_controller_type type) {
       SDL_assert(gamecontroller);
       M_Log("[Game/Controller] Found game controller \"%s\"\n", SDL_GameControllerName(gamecontroller));
       controller->handle_event = G_Controller_Gamepad_HandleEvent;
+      controller->shutdown = G_Controller_Gamepad_Shutdown;
       controller->device = gamecontroller;
       controller->device_id = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamecontroller));
       SDL_GameControllerEventState(SDL_ENABLE);
@@ -114,7 +91,9 @@ g_controller_t *G_Controller_Create(g_controller_type type) {
 
 void G_Controller_Free(g_controller_t *controller) {
   if (controller) {
-    // TODO: free/close device
+    if (controller->shutdown) {
+      controller->shutdown(controller);
+    }
     free(controller);
   }
 }
@@ -142,15 +121,15 @@ bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Eve
     input_state->movement.x = pressed ? 1.0f : 0.0f;
   }
 
-  // TODO: We need to return false here, otherwise the other keyboard controller
-  // can't process keys.
-  return false;
+  return true;
 }
 
 // A 10% deadzone.
 const int16_t CONTROLLER_DEADZONE = 3276;
 
 float normalize_gamepad_axis(int16_t value) {
+  // TODO: Maybe this could be normalized then the deadzone applied and the
+  // result rescaled to give smoother range of motion?
   if (abs(value) < CONTROLLER_DEADZONE) {
     return 0.0f;
   } else {
@@ -185,4 +164,10 @@ bool G_Controller_Gamepad_HandleEvent(g_controller_t *controller, const SDL_Even
   }
 
   return true;
+}
+
+void G_Controller_Gamepad_Shutdown(g_controller_t *controller) {
+  if (controller->device) {
+    SDL_GameControllerClose(controller->device);
+  }
 }

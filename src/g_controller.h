@@ -34,12 +34,13 @@ struct g_controller_t {
   void *device;
   int32_t device_id;
   bool (*handle_event)(g_controller_t *controller, const SDL_Event *event);
+  void (*shutdown)(g_controller_t *controller);
 };
 
 void G_Controllers_Init();
 void G_Controllers_Shutdown();
 void G_Controllers_Attach(g_controller_t *controller);
-void G_Controllers_HandleEvent(const SDL_Event *event);
+bool G_Controllers_HandleEvent(const SDL_Event *event);
 
 g_controller_t *G_Controller_Create(g_controller_type type);
 void G_Controller_Free(g_controller_t *controller);
