@@ -14,6 +14,7 @@ typedef struct game_state {
   uint32_t screen_height;
   double target_fps;
   double target_frame_time;
+  uint32_t current_tick;
   double delta_time;
   bool is_running;
 

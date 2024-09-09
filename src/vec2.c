@@ -32,10 +32,16 @@ void vec2_imul(vec2_t *v, float factor) {
   v->x *= factor;
   v->y *= factor;
 }
+
 vec2_t vec2_div(const vec2_t *v, float factor) {
   vec2_t u = { .x = v->x / factor, .y = v->y / factor };
   return u;
 }
+void vec2_idiv(vec2_t *v, float factor) {
+  v->x /= factor;
+  v->y /= factor;
+}
+
 float vec2_length(const vec2_t *v) {
   return sqrt(v->x * v->x + v->y * v->y);
 }

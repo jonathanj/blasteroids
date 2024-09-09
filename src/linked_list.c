@@ -44,6 +44,24 @@ void linked_list_remove(linked_list_node_t *head, linked_list_node_t *node) {
   }
 }
 
+// TODO: I don't know if this is correct.
+void linked_list_remove_by_data(linked_list_node_t *head, void *data) {
+  SDL_assert(head != NULL);
+  SDL_assert(data != NULL);
+
+  linked_list_node_t *last = head;
+  linked_list_node_t *current = head;
+  while (current != NULL) {
+    if (current->data == data) {
+      last->next = current->next;
+      free(current);
+      break;
+    }
+    last = current;
+    current = current->next;
+  }
+}
+
 void linked_list_iterate(linked_list_node_t *head, void(*func)(void *data, void *extra), void *extra) {
   SDL_assert(func != NULL);
 

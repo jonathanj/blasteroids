@@ -11,6 +11,7 @@ typedef struct {
   vec2_t position;
   vec2_t velocity;
   vec2_t accel;
+  float friction;
 
   // Collision response.
   float restitution;

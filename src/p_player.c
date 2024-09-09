@@ -1,8 +1,11 @@
 #include "p_player.h"
+#include "p_bullet.h"
 #include "p_util.h"
 #include "p_entity.h"
 #include "m_message.h"
+#include "m_util.h"
 #include "r_renderer.h"
+#include "r_particles.h"
 
 #define PLAYER_DEATH_INVULNERABLE_TIME_SECONDS 2.0f;
 
@@ -11,11 +14,12 @@ typedef struct {
   const char *name;
   uint32_t color;
   float invulnerable_time;
+  float last_primary_action_time;
 } p_player_t;
 
 void P_Player_Destroy(void *data);
 void P_Player_Think(p_entity_t *entity, const game_state_t *state);
-bool P_Player_Collided(p_entity_t *entity, p_entity_t *other);
+bool P_Player_Collided(p_entity_t *entity, p_entity_t *other, const m_contact_t *contact);
 void P_Player_Render(p_entity_t *entity);
 
 void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t position, uint32_t color) {
@@ -24,6 +28,7 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
     .accel = {0, 0},
     .position = position,
     .velocity = velocity,
+    .friction = 0.0075f,
     .restitution = 0.3f,
     .inv_mass = 1 / (float)5.0f,
     .radius = 5.0f,
@@ -43,6 +48,7 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
   player->name = name;
   player->color = color;
   player->invulnerable_time = 0.0f;
+  player->last_primary_action_time = 0.0f;
   entity->data = (void *)player;
 
   entity->destroy = P_Player_Destroy;
@@ -52,10 +58,11 @@ void P_Player_Spawn(const char *name, const g_controller_t *controller, vec2_t p
 }
 
 // TODO: move these somewhere
-#define M_PI    3.14159265358979323846264338327950288
-#define M_HALF_PI 1.57079632679
 const float PLAYER_TURN_RATE = M_PI;
 const float PLAYER_ACCEL_RATE = 100;
+const float PLAYER_PRIMARY_ACTION_RATE = 350;
+
+m_color_ramp_t ramp_thrust = { 0xFFFFFFFF, 0xFF00FFFF, 0xFF00A5FF, 0x7F0000FF, 0xFF000000 };
 
 void P_Player_Think(p_entity_t *entity, const game_state_t *state) {
   p_player_t *player = entity->data;
@@ -68,21 +75,43 @@ void P_Player_Think(p_entity_t *entity, const game_state_t *state) {
   }
 
   // Process input.
+  float theta = entity->dir_angle - M_HALF_PI;
   const g_controller_input_state_t *input_state = &player->controller->input_state;
   float thrust = input_state->thrust;
   if (thrust > 0) {
-    float theta = entity->dir_angle - M_HALF_PI;
     entity->contact_body.accel.x = thrust * PLAYER_ACCEL_RATE * SDL_cos(theta);
     entity->contact_body.accel.y = thrust * PLAYER_ACCEL_RATE * SDL_sin(theta);
+
+    // FIXME: Don't do this every game loop, rather emit every N ms.
+    vec2_t pos = entity->contact_body.position;
+    vec2_t vel = entity->contact_body.accel;
+    vec2_normalize(&vel);
+    vec2_t pos_offset = vel;
+    vec2_imul(&pos_offset, -5.0f);
+    vec2_iadd(&pos, &pos_offset);
+    vec2_imul(&vel, -100.0f);
+    R_Particles_Emit(10, pos, vel, vec2_new(20, 60), 0.25f, 0.1f, ramp_thrust);
   } else {
     entity->contact_body.accel.x = 0;
     entity->contact_body.accel.y = 0;
   }
 
   entity->dir_angle += input_state->movement.x * PLAYER_TURN_RATE * dt;
+
+  if (input_state->primary_action > 0) {
+    if (state->current_tick - player->last_primary_action_time >= PLAYER_PRIMARY_ACTION_RATE) {
+      // TODO: Spawn a bullet
+      vec2_t bullet_vel = { entity->contact_body.radius * 2 * SDL_cos(theta), entity->contact_body.radius * 2 * SDL_sin(theta) };
+      vec2_t bullet_pos = vec2_add(&entity->contact_body.position, &bullet_vel);
+      P_Bullet_Spawn(bullet_pos, theta);
+      player->last_primary_action_time = state->current_tick;
+    }
+  }
 }
 
-bool P_Player_Collided(p_entity_t *entity, p_entity_t *other) {
+#define Color_Alpha(c, a) (((a << 24) & 0xFF000000) | (c & 0x00FFFFFF))
+
+bool P_Player_Collided(p_entity_t *entity, p_entity_t *other, const m_contact_t *contact SDL_UNUSED) {
   p_player_t *player = entity->data;
   SDL_assert(player != NULL);
 
@@ -96,8 +125,10 @@ bool P_Player_Collided(p_entity_t *entity, p_entity_t *other) {
       // TODO: Implement real logic.
       entity->dir_angle += 0.39;
       player->invulnerable_time = PLAYER_DEATH_INVULNERABLE_TIME_SECONDS;
-      return true;
+      // fallthrough
     case ENTITY_PLAYER:
+      // FIXME
+      //R_Particles_Emit(10, entity->contact_body.position, vec2_new(0, 0), vec2_new(40.0f, 40.0f), 0.8f, 0.15f, player->color, Color_Alpha(player->color, 0));
       return true;
     default:
       return false;
@@ -110,19 +141,19 @@ void P_Player_Render(p_entity_t *entity) {
   m_contact_body_t *body = &entity->contact_body;
 
   // Draw the thruster.
-  if (vec2_length(&body->accel) > 0) {
-    vec2_t vt[] = {
-      {-2.5f,  5.5f},
-      { 0.0f,  10.0f},
-      { 2.5f,  5.5f}
-    };
-    size_t vt_count = sizeof(vt) / sizeof(vec2_t);
-    for (size_t i = 0; i < vt_count; ++i) {
-      vec2_irotate(&vt[i], entity->dir_angle);
-      vec2_iadd(&vt[i], &body->position);
-    }
-    R_DrawWireframe(vt, vt_count, 0xFF00FFFF);
-  }
+  // if (vec2_length(&body->accel) > 0) {
+  //   vec2_t vt[] = {
+  //     {-2.5f,  5.5f},
+  //     { 0.0f,  10.0f},
+  //     { 2.5f,  5.5f}
+  //   };
+  //   size_t vt_count = sizeof(vt) / sizeof(vec2_t);
+  //   for (size_t i = 0; i < vt_count; ++i) {
+  //     vec2_irotate(&vt[i], entity->dir_angle);
+  //     vec2_iadd(&vt[i], &body->position);
+  //   }
+  //   R_DrawWireframe(vt, vt_count, 0xFF00FFFF);
+  // }
 
   // Draw the ship.
   vec2_t vs[] = {
@@ -151,51 +182,4 @@ void P_Player_Destroy(void *data) {
   if (player) {
     free(player);
   }
-}
-
-///////////////
-
-#define PLAYER_MAX_SPEED 200
-
-player_t P_Init(double x, double y, double angle) {
-  player_t player = {
-    .dir_angle = angle,
-    .pos = {x, y},
-    .accel = {0.0f, 0.0f},
-    .velocity = {0.0f, 0.0f}
-  };
-  return player;
-}
-
-void P_Think(player_t *player, game_state_t *state) {
-  float delta_time = state->delta_time;
-
-  // Update physics.
-  vec2_t velocity = vec2_mul(&player->accel, delta_time);
-  vec2_iadd(&velocity, &player->velocity);
-  if (vec2_length(&velocity) <= PLAYER_MAX_SPEED) {
-    player->velocity = velocity;
-  }
-
-  vec2_imul(&velocity, delta_time);
-  vec2_iadd(&player->pos, &velocity);
-  // P_Wrap_Position(&player->pos, state->screen_width, state->screen_height);
-
-  // float screen_width = state->screen_width;
-  // float screen_height = state->screen_height;
-  // player->pos.x += player->velocity.x * delta_time;
-  // if (player->pos.x < 0) {
-  //   player->pos.x += screen_width;
-  // }
-  // if (player->pos.x >= screen_width) {
-  //   player->pos.x -= screen_width;
-  // }
-
-  // player->pos.y += player->velocity.y * delta_time;
-  // if (player->pos.y < 0) {
-  //   player->pos.y += screen_height;
-  // }
-  // if (player->pos.y >= screen_height) {
-  //   player->pos.y -= screen_height;
-  // }
 }

@@ -14,6 +14,7 @@ void vec2_isub(vec2_t *v, const vec2_t *b);
 vec2_t vec2_mul(const vec2_t *v, float factor);
 void vec2_imul(vec2_t *v, float factor);
 vec2_t vec2_div(const vec2_t *v, float factor);
+void vec2_idiv(vec2_t *v, float factor);
 float vec2_length(const vec2_t *v);
 float vec2_dot(const vec2_t *a, const vec2_t *b);
 float vec2_cross(const vec2_t *a, const vec2_t *b);

@@ -18,9 +18,11 @@ typedef enum {
 typedef struct {
   vec2_t movement;
   float thrust;
+  float primary_action;
 } g_controller_input_state_t;
 
 typedef struct {
+  SDL_Scancode primary_action;
   SDL_Scancode thrust;
   SDL_Scancode turn_left;
   SDL_Scancode turn_right;

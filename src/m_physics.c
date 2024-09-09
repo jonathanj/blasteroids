@@ -79,13 +79,16 @@ void M_Physics_SimulateStep(m_contact_body_t *body, const world_t *world, float 
   vec2_iadd(&new_vel, &body->velocity);
 
   // Apply maximum maximum speed limit.
-  float speed = vec2_length(&new_vel);
-  if (speed > MAX_SPEED_FIXME) {
-    vec2_normalize(&new_vel);
-    vec2_imul(&new_vel, MAX_SPEED_FIXME);
-  }
+  // float speed = vec2_length(&new_vel);
+  // if (speed > MAX_SPEED_FIXME) {
+  //   vec2_normalize(&new_vel);
+  //   vec2_imul(&new_vel, MAX_SPEED_FIXME);
+  // }
 
   body->velocity = new_vel;
+  if (body->friction > 0) {
+    vec2_imul(&body->velocity, 1.0f - body->friction);
+  }
 
   vec2_imul(&new_vel, delta_time);
   vec2_iadd(&body->position, &new_vel);

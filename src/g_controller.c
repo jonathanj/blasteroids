@@ -2,15 +2,17 @@
 #include "m_message.h"
 
 static const g_controller_keymap_t KEYBOARD1_KEYMAP = {
-  .thrust = SDL_SCANCODE_W,
-  .turn_left = SDL_SCANCODE_A,
-  .turn_right = SDL_SCANCODE_D,
-};
-
-static const g_controller_keymap_t KEYBOARD2_KEYMAP = {
+  .primary_action = SDL_SCANCODE_SLASH,
   .thrust = SDL_SCANCODE_UP,
   .turn_left = SDL_SCANCODE_LEFT,
   .turn_right = SDL_SCANCODE_RIGHT,
+};
+
+static const g_controller_keymap_t KEYBOARD2_KEYMAP = {
+  .primary_action = SDL_SCANCODE_G,
+  .thrust = SDL_SCANCODE_W,
+  .turn_left = SDL_SCANCODE_A,
+  .turn_right = SDL_SCANCODE_D,
 };
 
 static linked_list_node_t *controllers = NULL;
@@ -115,6 +117,10 @@ bool G_Controller_Keyboard_HandleEvent(g_controller_t *controller, const SDL_Eve
     input_state->thrust = pressed ? 1.0f : 0.0f;
   }
 
+  if (scancode == keymap->primary_action) {
+    input_state->primary_action = pressed ? 1.0f : 0.0f;
+  }
+
   if (scancode == keymap->turn_left) {
     input_state->movement.x = pressed ? -1.0f : 0.0f;
   } else if (scancode == keymap->turn_right) {
@@ -161,6 +167,14 @@ bool G_Controller_Gamepad_HandleEvent(g_controller_t *controller, const SDL_Even
           input_state->thrust = -normalize_gamepad_axis(SDL_min(0, event->caxis.value));
           break;
       }
+      break;
+
+    case SDL_CONTROLLERBUTTONUP:
+      input_state->primary_action = 0.0f;
+      break;
+    case SDL_CONTROLLERBUTTONDOWN:
+      input_state->primary_action = 1.0f;
+      break;
   }
 
   return true;

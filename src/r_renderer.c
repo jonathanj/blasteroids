@@ -1,11 +1,14 @@
 #include <stdarg.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "r_renderer.h"
+#include "r_particles.h"
 #include "m_message.h"
+#include "m_util.h"
+#include "m_noise.h"
 #include "a_bitmap.h"
 #include "a_font.h"
-#include "vec2.h"
 
 #include "p_entity.h"
 
@@ -59,6 +62,9 @@ bool R_LoadFonts() {
   return true;
 }
 
+// XXX
+void xxx_gen_noise();
+
 bool R_Init(SDL_Window *window, const game_state_t *game_state) {
   sdl_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
   if (sdl_renderer == NULL) {
@@ -73,12 +79,18 @@ bool R_Init(SDL_Window *window, const game_state_t *game_state) {
     return false;
   }
   SDL_RenderSetLogicalSize(sdl_renderer, render_width, render_height);
+  SDL_SetTextureBlendMode(framebuffer_texture, SDL_BLENDMODE_BLEND);
+  SDL_SetRenderDrawBlendMode(sdl_renderer, SDL_BLENDMODE_BLEND);
 
   if (!R_LoadFonts()) {
     return false;
   }
 
   M_Log("[Renderer] Initialized %dx%d\n", render_width, render_height);
+
+  // XXX:
+  initPermutation();
+  xxx_gen_noise();
 
   return true;
 }
@@ -103,13 +115,45 @@ void R_Shutdown() {
 }
 
 void R_UpdateScreen() {
+  SDL_SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255);
+  SDL_RenderClear(sdl_renderer);
   SDL_UpdateTexture(framebuffer_texture, NULL, framebuffer, (int)(screen_width * sizeof(uint32_t)));
   SDL_RenderCopy(sdl_renderer, framebuffer_texture, NULL, NULL);
   SDL_RenderPresent(sdl_renderer);
 }
 
 void R_ClearFrameBuffer() {
-  memset(framebuffer, 0, framebuffer_size);
+  //memset(framebuffer, 0, framebuffer_size);
+  size_t count = screen_width * screen_height;
+  for (size_t idx = 0; idx < count; ++idx) {
+    framebuffer[idx] = 0xFF000000;
+  }
+}
+
+uint32_t blend_colors(uint32_t srcColor, uint32_t destColor) {
+  // Extract RGBA components from the source color
+  uint8_t srcA = (srcColor >> 24) & 0xFF;
+  uint8_t srcB = (srcColor >> 16) & 0xFF;
+  uint8_t srcG = (srcColor >> 8) & 0xFF;
+  uint8_t srcR = srcColor & 0xFF;
+
+  // Extract RGBA components from the destination color
+  uint8_t destA = (destColor >> 24) & 0xFF;
+  uint8_t destB = (destColor >> 16) & 0xFF;
+  uint8_t destG = (destColor >> 8) & 0xFF;
+  uint8_t destR = destColor & 0xFF;
+
+  // Normalize alpha to the range [0.0, 1.0]
+  float alpha = srcA / 255.0f;
+
+  // Compute the blended color components
+  uint8_t outR = (uint8_t)((srcR * alpha) + (destR * (1 - alpha)));
+  uint8_t outG = (uint8_t)((srcG * alpha) + (destG * (1 - alpha)));
+  uint8_t outB = (uint8_t)((srcB * alpha) + (destB * (1 - alpha)));
+  uint8_t outA = (uint8_t)(srcA + (destA * (1 - alpha)));  // Optional: you may choose to keep the destination alpha
+
+  // Combine components back into a single uint32_t value
+  return (outA << 24) | (outB << 16) | (outG << 8) | outR;
 }
 
 void R_DrawPoint(int32_t x, int32_t y, uint32_t color) {
@@ -120,10 +164,28 @@ void R_DrawPoint(int32_t x, int32_t y, uint32_t color) {
 
   SDL_assert(x >= 0 && x < screen_width);
   SDL_assert(y >= 0 && y < screen_height);
-  framebuffer[(screen_width * y) + x] = color;
+  size_t index = (screen_width * y) + x;
+  uint32_t existing = framebuffer[index];
+  framebuffer[index] = blend_colors(color, existing);
 }
 
-void R_DrawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t color) {
+// void R_DrawPointAA(int32_t x, int32_t y, uint32_t color) {
+//   R_DrawPoint(x, y, color);
+//   return;
+//   if (x < 0) x = (x + screen_width) % screen_width;
+//   if (x >= screen_width) x = (x - screen_width) % screen_width;
+//   if (y < 0) y = (y + screen_height) % screen_height;
+//   if (y >= screen_height) y = (y - screen_height) % screen_height;
+
+//   SDL_assert(x >= 0 && x < screen_width);
+//   SDL_assert(y >= 0 && y < screen_height);
+//   uint32_t current = framebuffer[(screen_width * y) + x];
+//   uint32_t current_alpha = current & 0xFF000000;
+//   uint32_t alpha = SDL_max(current_alpha, color & 0xFF000000);
+//   framebuffer[(screen_width * y) + x] = alpha | (color & 0x00FFFFFF);
+// }
+
+void R_DrawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {
   int32_t dx = abs(x1 - x0);
   int32_t sx = x0 < x1 ? 1 : -1;
   int32_t dy = -abs(y1 - y0);
@@ -152,6 +214,41 @@ void R_DrawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t color) {
       }
       error += dx;
       y0 += sy;
+    }
+  }
+}
+
+/* draw a black (0) anti-aliased line on white (255) background */
+void R_DrawLineAA(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {
+  int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, x2;
+  long dx = abs(x1 - x0), dy = abs(y1 - y0), err = dx * dx + dy * dy;
+  long e2 = err == 0 ? 1 : 0xffff7fl / sqrt(err);     /* multiplication factor */
+  color = 0x00FFFFFF & color;
+  uint32_t alpha = 0x00000000;
+
+  dx *= e2; dy *= e2; err = dx - dy;                       /* error value e_xy */
+  for (;;) {                                                 /* pixel loop */
+    // R_DrawPoint(x0, y0, abs(err - dx + dy) >> 16);
+    alpha = 255 - (abs(err - dx + dy) >> 16);
+    R_DrawPoint(x0, y0, (alpha << 24) | color);
+    e2 = err; x2 = x0;
+    if (2 * e2 >= -dx) {                                            /* x step */
+      if (x0 == x1) break;
+      if (e2 + dy < 0xff0000l) {
+        // R_DrawPoint(x0, y0 + sy, (e2 + dy) >> 16);
+        alpha = 255 - ((e2 + dy) >> 16);
+        R_DrawPoint(x0, y0 + sy, (alpha << 24) | color);
+      }
+      err -= dy; x0 += sx;
+    }
+    if (2 * e2 <= dy) {                                             /* y step */
+      if (y0 == y1) break;
+      if (dx - e2 < 0xff0000l) {
+        // R_DrawPoint(x2 + sx, y0, (dx - e2) >> 16);
+        alpha = 255 - ((dx - e2) >> 16);
+        R_DrawPoint(x2 + sx, y0, (alpha << 24) | color);
+      }
+      err += dx; y0 += sy;
     }
   }
 }
@@ -223,9 +320,9 @@ void R_DrawWireframe(const vec2_t *v, size_t v_count, uint32_t color) {
   SDL_assert(v_count > 1);
 
   for (size_t i = 1; i < v_count; ++i) {
-    R_DrawLine(v[i - 1].x, v[i - 1].y, v[i].x, v[i].y, color);
+    R_DrawLineAA(v[i - 1].x, v[i - 1].y, v[i].x, v[i].y, color);
   }
-  R_DrawLine(v[v_count - 1].x, v[v_count - 1].y, v[0].x, v[0].y, color);
+  R_DrawLineAA(v[v_count - 1].x, v[v_count - 1].y, v[0].x, v[0].y, color);
 }
 
 void R_DrawTextFont(font_t *font, int32_t x, int32_t y, const char *format, va_list args) {
@@ -269,48 +366,134 @@ void R_DrawSmallText(int32_t x, int32_t y, const char *format, ...) {
   va_end(args);
 }
 
-void R_DrawPlayer(const player_t *player) {
-  // Draw the thruster.
-  if (vec2_length(&player->accel) > 0) {
-    vec2_t vt[] = {
-      {-2.5f,  5.5f},
-      { 0.0f,  10.0f},
-      { 2.5f,  5.5f}
-    };
-    size_t vt_count = sizeof(vt) / sizeof(vec2_t);
-    for (size_t i = 0; i < vt_count; ++i) {
-      vec2_irotate(&vt[i], player->dir_angle);
-      vec2_iadd(&vt[i], &player->pos);
-    }
-    R_DrawWireframe(vt, vt_count, 0xFF00FFFF);
-  }
+#define NOISE_WIDTH 512
+#define NOISE_HEIGHT 512
 
-  // Draw the ship.
-  vec2_t vs[] = {
-    {0.0f, -10.0f},
-    {5.0f, 5.0f},
-    {-5.f, 5.0f}
-  };
-  size_t vs_count = sizeof(vs) / sizeof(vec2_t);
-  for (size_t i = 0; i < vs_count; ++i) {
-    vec2_irotate(&vs[i], player->dir_angle);
-    vec2_iadd(&vs[i], &player->pos);
-  }
-  R_DrawWireframe(vs, vs_count, 0xFF0000FF);
+double noise[NOISE_WIDTH * NOISE_HEIGHT];
 
-  R_DrawText(player->pos.x - 11, player->pos.y + 10, "Emma");
-}
+#define STARS_MAX_COUNT 25000
+typedef struct {
+  uint32_t x;
+  uint32_t y;
+  uint32_t color;
+  double brightness;
+} lol_star_t;
+static lol_star_t stars[STARS_MAX_COUNT];
 
-void R_Render(game_state_t *game_state __attribute__((unused)), player_t *player SDL_UNUSED) {
+void R_Render(game_state_t *game SDL_UNUSED) {
   R_ClearFrameBuffer();
 
   P_EntityManager_Render();
-  // R_DrawPlayer(player);
-  // R_DrawText(100, 100, "Hello world!"); 
-  // float speed = vec2_length(&player->velocity);
-  // R_DrawText(4, 384 - 16, "pos: %.0f,%.0f   vel: %.0f,%.0f  spd: %.0f", player->pos.x, player->pos.y, player->velocity.x, player->velocity.y, speed);
 
-  // R_Debugging(player);
+  // int32_t mouse_x, mouse_y;
+  // SDL_GetMouseState(&mouse_x, &mouse_y);
+  // R_DrawCircle(mouse_x / 2, mouse_y / 2, 2, 0xFF0000FF);
+
+  // TODO: Don't update this in render?
+  R_Particles_Update(game->delta_time);
+  R_Particles_Render();
+
+  // for (int y = 0; y < 400; ++y) {
+  //   for (int x = 0; x < 400; ++x) {
+  //     double n = noise[(y % NOISE_HEIGHT) * NOISE_WIDTH + (x % NOISE_WIDTH)];
+  //     //uint32_t c = n * 255;
+  //     //uint32_t color = 0xFF000000 | (c << 16) | (c << 8) | c;
+  //     uint32_t color = 0xFF000000;
+
+  //     if (n > 0.98) {
+  //       color = 0xFFFF0000;
+  //     }
+  //     R_DrawPoint(x, y, color);
+  //   }
+  // }
+
+  for (size_t i = 0; i < STARS_MAX_COUNT; ++i) {
+    // float brightness = ((stars[i].brightness / 2.0f) * ((SDL_sinf(game->current_tick * 0.00025) + 1.0) / 2.0f)) + 0.25f;
+    float brightness = stars[i].brightness;
+    //stars[i].brightness = fmod(stars[i].brightness + (0.000025 * game->delta_time) * 255, 0.5);
+    uint8_t a = brightness * 255;
+    uint32_t color = (a << 24) | stars[i].color;
+    R_DrawPoint(stars[i].x, stars[i].y, color);
+  }
 
   R_UpdateScreen();
+}
+
+void xxx_gen_noise() {
+  size_t lol_idx = 0;
+  size_t dist = (1024 * 768 / STARS_MAX_COUNT) * 4;
+  double scale = 0.025;
+  for (size_t i = 0; i < STARS_MAX_COUNT; ++i) {
+    lol_idx += rand_float() * dist;
+    if (lol_idx >= 1024 * 768) {
+      break;
+    }
+    uint32_t x = lol_idx % 768;
+    uint32_t y = lol_idx / 768;
+    stars[i].x = x;
+    stars[i].y = y;
+    double n = PerlinNoise3D(x * scale, 0, y * scale, 1234, 2, 0.5);
+    n = SDL_clamp((n + 1.0) * 0.5, 0, 1);
+    uint8_t r, g, b;
+    if (n > 0.85) {
+      r = n * 127;
+      g = n * 127;
+      b = n * 255;
+    } else if (n > 0.5) {
+      r = n * 200;
+      g = n * 200;
+      b = n * 250;
+    } else {
+      r = n * 225;
+      g = n * 100;
+      b = n * 100;
+    }
+    // uint8_t r = n * 127;
+    // uint8_t g = n * 125;
+    // uint8_t b = n * 255;
+    stars[i].color = 0x00000000 | (b << 16) | (g << 8) | r;
+    //stars[i].brightness = SDL_clamp((n + 1.0) * 0.5, 0, 1);
+    stars[i].brightness = n * n * n;
+    //stars[i].brightness *= stars[i].brightness;
+  }
+
+  for (int y = 0; y < NOISE_HEIGHT; ++y) {
+    for (int x = 0; x < NOISE_WIDTH; ++x) {
+      // double scale = 0.025;
+
+      //double n = SDL_clamp(pnoise2d(x, y, 1.0, 5, 12345), -2, 2);
+      //uint32_t c = ((n + 2.0) / 4.0) * 255;
+      // float n = perlin2D_octaves(fx * scale, fy * scale, 3, 0.7f);
+      // n = SDL_clamp(n * 5.0f, -1, 1);
+      // n = n > 0 ? powf(n, 2) : -powf(n, 2);
+      //float n = fbm(fx * scale, fy * scale, 5, 0.85f, 1.25f);
+      // double n = ken_noise(x * scale, y * scale, 0.0, 5, 0.7);
+      //double n = ken_noise_vanilla(x * scale, y * scale, 0.0);
+      // double n = fbm2D(x * scale, y * scale, 5, 1.15, 0.25);
+      // n = sigmoid(n, 5.0);
+      //n = SDL_clamp(n * 1.2, -1, 1);
+
+
+      // double fx = x * scale;
+      // double fy = y * scale;
+      // double n = PerlinNoise3D(fx, 0, fy, 1234, 7, 0.8);
+
+      // double n = 0.0;
+      // double curPersistence = 1.0;
+      // for (int octave = 0; octave < 3; ++octave) {
+      //   double signal = GradientCoherentNoise3D(fx, 0, fy, 1234, NOISE_QUALITY_BEST);
+      //   signal = 2.0 * fabs(signal) - 1.0;
+      //   n += signal * curPersistence;
+
+      //   fx *= 1.3;
+      //   fy *= 1.3;
+      //   curPersistence *= 0.3;
+      // }
+      // n += 0.5;
+
+      // noise[y * NOISE_WIDTH + x] = SDL_clamp((n + 1.0) / 2.0, 0, 1);
+
+      noise[y * NOISE_WIDTH + x] = rand_float();
+    }
+  }
 }
